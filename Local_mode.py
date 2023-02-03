@@ -30,7 +30,12 @@ lum_range = [155, 50]           # Se declaran los valores de la resistancia, pro
                                 #   - lum_range[0] : División Dark-Middle   ;     Es decir lum > lum_range[0] es considerado "Dark").
                                 #   - lum_range[1] : División Middle-Light  ;     Es decir lum_range[0] >= lum > lum_range[1] es considerado "Middle").  
                                 #                                                 Es decir lum_range[1] >= lum > 2 es considerado "Light").  
-       
+
+DARK_RGB = [119, 0, 200]        # Se define el color en valores RGB que se desea para cada categoría de iluminación.
+MIDDLE_RGB = [197, 57, 255]
+LIGHT_RGB = [246, 255, 255]
+                 
+ 
 tiempo_bombeo = 5               # Aquí se define el tiempo de bombeo como 5 segundos con base a lo requeridos (Este es un valor ejemplo).
 
 # Base de Datos:
@@ -47,38 +52,34 @@ horas_sin_regar = 0
 
 # Definición de Función:
 
-def control_RGB(lum_anterior, lum_actual):                          # Función encargada de realizar los cambios en la tonalidad de la pantalla con base
+def control_RGB(lum_anterior, lum_actual, DARK_RGB, MIDDLE_RGB, 
+                LIGHT_RGB):                                         # Función encargada de realizar los cambios en la tonalidad de la pantalla con base
                                                                     # al nivel de iluminación actual.
         
     if lum_anterior != lum_actual and not(lum_anterior == 'nan'):   # Solo realizan cambios si hay cambio en el nivel de iluminación y si no es un valor 'nan'.
         
-                                                                    # Se definen los valores de la tonalidad (RGB) presente y la tonalidad deseada.
-        if lum_anterior == 'Dark':
-            r = 119
-            g = 0
-            b = 200
+                                                                    
+        if lum_anterior == 'Dark':                                  # Se definen los valores de la tonalidad (RGB) presente y la tonalidad deseada.
+            rgb = DARK_RGB
         elif lum_anterior == 'Middle':
-            r = 197
-            g = 57
-            b = 255
+            rgb = MIDDLE_RGB
         elif lum_anterior == 'Light':
-            r = 246
-            g = 255
-            b = 255
+            rgb = LIGHT_RGB
 
         if lum_actual == 'Dark':
-            r_objetivo = 119
-            g_objetivo = 0
-            b_objetivo = 200
+            rgb_objetivo = DARK_RGB
         elif lum_actual == 'Middle':
-            r_objetivo = 197
-            g_objetivo = 57
-            b_objetivo = 255
+            rgb_objetivo = MIDDLE_RGB
         elif lum_actual == 'Light':
-            r_objetivo = 246
-            g_objetivo = 255
-            b_objetivo = 255
+            rgb_objetivo = LIGHT_RGB
             
+        r = rgb[0]
+        g = rgb[1]
+        b = rgb[2]
+        r_objetivo = rgb_objetivo[0]
+        g_objetivo = rgb_objetivo[1]
+        b_objetivo = rgb_objetivo[2]
+        
         diffs = [r_objetivo - r, g_objetivo - g, b_objetivo - b]                        # Se obtiene la diferencia entre los valores RGB.
         diffs_abs = [abs(r_objetivo - r), abs(g_objetivo - g), abs(b_objetivo - b)]     # Se obtiene el valor absoluto de estas diferencias.
         
@@ -95,7 +96,7 @@ def control_RGB(lum_anterior, lum_actual):                          # Función e
             
             for _ in range(iteraciones):
                 
-                if r > x_objetivo:
+                if r > r_objetivo:
                     r = r - 1
                 if g > g_objetivo:
                     g = g - 1
@@ -117,7 +118,6 @@ def control_RGB(lum_anterior, lum_actual):                          # Función e
                  
                 setRGB(r, g, b)
                 sleep(0.001)
-            
                     
 
 def hum(dht_port, dht_type):                                    # Función para medir la humedad ambiente ó detectar posibles errores en el sensor dht.
@@ -144,10 +144,11 @@ def temp(dht_port, dht_type):                                   # Función para 
         print(str(e))
         setText("")
 
-def lum_sen(lum_port, lum_range, lum_anterior):                 # Función para medir la iluminación ambiente ó detectar posibles errores en el sensor
-                                                                # y categorizar la intensidad lumínica del momento con base con los rangos anteriormente
-                                                                # definidos anteriormente (lum_range).
+def lum_sen(lum_port, lum_range, lum_anterior, DARK_RGB, MIDDLE_RGB, # Función para medir la iluminación ambiente ó detectar posibles errores en el sensor
+            LIGHT_RGB):                                              # y categorizar la intensidad lumínica del momento con base con los rangos anteriormente
+                                                                     # definidos anteriormente (lum_range).
     try:
+                                                                     
         dark_middle = lum_range[0]
         middle_sunlight = lum_range[1]
         sensor_value = analogRead(lum_port)
@@ -158,15 +159,15 @@ def lum_sen(lum_port, lum_range, lum_anterior):                 # Función para 
         
         if resistance > dark_middle:                                        # Se define el rango luminíco (lum) y se llama a la función control_RGB()
                                                                             # para realizar el cambio correspondiente en la tonalidad del display
-            control_RGB(lum_anterior, 'Dark')                               
+            control_RGB(lum_anterior, 'Dark', DARK_RGB, MIDDLE_RGB, LIGHT_RGB)                               
             lum = "Dark"
             
         elif dark_middle >= resistance > middle_sunlight:
-            control_RGB(lum_anterior, 'Middle')
+            control_RGB(lum_anterior, 'Middle', DARK_RGB, MIDDLE_RGB, LIGHT_RGB)
             lum = "Middle"
                 
         elif middle_sunlight >= resistance >= 2:
-            control_RGB(lum_anterior, 'Light')
+            control_RGB(lum_anterior, 'Light', DARK_RGB, MIDDLE_RGB, LIGHT_RGB)
             lum = "Light"
         else:
             raise TypeError('Values out of range. Light sensor')            # Se eleva un error por medición de valores fuera de rango.
@@ -225,7 +226,7 @@ while True:                                                                 # Bu
                 
         temperature = temp(dht_sensor_port, dht_type)                       # Se realizan las mediciones y se imprimen en el display.
         humidity = hum(dht_sensor_port, dht_type)
-        lum = lum_sen(light_sensor_port, lum_range, lum)
+        lum = lum_sen(light_sensor_port, lum_range, lum, DARK_RGB, MIDDLE_RGB, LIGHT_RGB)
         display(temperature, humidity, lum)
         
         estado_rele, horas_sin_regar = rele(temperature, humidity, lum, rele_port, horas_sin_regar, tiempo_bombeo) # Se ejecuta la función rele() para determinar
