@@ -24,6 +24,8 @@ lum = ""
 
 lum_range = [155, 50]
 
+
+lum_anterior = ""
 tiempo_bombeo = 5
 
 ### Base de Datos()
@@ -63,7 +65,7 @@ def temp(dht_port, dht_type):
         print(str(e))
         setText("")
 
-def lum_sen(lum_port, lum_range):
+def lum_sen(lum_port, lum_range, lum_anterior):
     try:
 
         dark_middle = lum_range[0]
@@ -76,21 +78,95 @@ def lum_sen(lum_port, lum_range):
         resistance = (float)((1023 - sensor_value) * 68) / sensor_value
 #         print("\n", resistance, "\n")
         if resistance > dark_middle:
+            
+            if lum_anterior == 'Middle':
+                x = 197
+                y = 57
+                z = 255
+                for _ in range(78):
+                    if y > 0:
+                        y = y - 1
+                    if z > 200:
+                        z = z - 1
+                    x = x - 1
+
+                    setRGB(x, y, z)
+                    sleep(0.001)
+            elif lum_anterior == 'Light':
+                x = 246
+                y = 255
+                z = 255
+                for _ in range(255):
+                    if x > 119:
+                        x = x - 1
+                    if z > 200:
+                        z = z - 1
+                    y = y - 1
+                    
+                    setRGB(x, y, z)
+                    sleep(0.001)
+            else:
+                setRGB(119, 0, 200)
+                
             lum = "Dark"
         elif dark_middle >= resistance > middle_sunlight:
+          
+            if lum_anterior == 'Light':
+                x = 246
+                y = 255
+#                 z = 255
+                for _ in range(198):
+                    if x > 197:
+                        x = x - 1
+                    y = y - 1
+
+                    setRGB(x, y, 255)
+                    sleep(0.001)
+            elif lum_anterior == 'Dark':
+                x = 119
+                y = 0
+                z = 200
+                for _ in range(78):
+                    if y < 57:
+                        y = y + 1
+                    if z < 255:
+                        z = z + 1
+                    x = x + 1
+
+                    setRGB(x, y, z)
+                    sleep(0.001)
+            else:
+                setRGB(197, 57, 255)
+            
             lum = "Middle"
-            x = 246
-            y = 225
-            z = 255
-            for _ in range(198):
-                if x > 197:
-                    x = x - 1
-                y = y - 1
-                
-                setRGB(x, y, z)
-                sleep(0.001)
                 
         elif middle_sunlight >= resistance >= 2:
+            if lum_anterior == 'Middle':
+                x = 197
+                y = 57
+#                 z = 255
+                for _ in range(198):
+                    if x < 246:
+                        x = x + 1
+                    y = y + 1
+
+                    setRGB(x, y, 255)
+                    sleep(0.001)
+            elif lum_anterior == 'Dark':
+                x = 119
+                y = 0
+                z = 200
+                for _ in range(255):
+                    if x < 246:
+                        x = x + 1
+                    if z < 255:
+                        z = z + 1
+                    y = y + 1
+                    
+                    setRGB(x, y, z)
+                    sleep(0.001)
+            else:
+                setRGB(246, 255, 255)
             lum = "Light"
         else:
             raise TypeError('Values out of range. Light sensor')
@@ -148,7 +224,7 @@ while True:
             
         temperature = temp(dht_sensor_port, dht_type)
         humidity = hum(dht_sensor_port, dht_type)
-        lum = lum_sen(light_sensor_port, lum_range)
+        lum = lum_sen(light_sensor_port, lum_range, lum_anterior)
         display(temperature, humidity, lum)
         
         estado_rele, horas_sin_regar = rele(temperature, humidity, lum, rele_port, horas_sin_regar, tiempo_bombeo)
@@ -160,7 +236,8 @@ while True:
             diferencia = date - date_anterior
             diferencia_horas = diferencia.total_seconds() / 3600
             horas_sin_regar = horas_sin_regar + diferencia_horas
-            
+        
+        lum_anterior = lum
         date_anterior = date    
         datos.appennd([id_, date_str, temperature, humidity, lum, estado_rele])
         
