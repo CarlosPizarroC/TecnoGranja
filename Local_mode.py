@@ -34,7 +34,7 @@ id_ = 0
 
 sampling = 3
 
-dias_sin_regar = 0
+horas_sin_regar = 0
 
 ####################
 
@@ -101,34 +101,42 @@ def lum_sen(lum_port, lum_range):
         print(str(e))
         return "nan"
 
-def rele(temperature, humidity, lum, rele_port, dias_sin_regar, tiempo_bombeo):
+def rele(temperature, humidity, lum, rele_port, horas_sin_regar, tiempo_bombeo):
     
     humidity = float(humidity)
     temperature = float(temperature)
+    
+    estado_bomba = ""
     
     if humidity < 40:
         digitalWrite(rele_port, 1)
         sleep(tiempo_bombeo)
         digitalWrite(rele_port, 0)
         
-        return 'Activada'
+        horas_sin_regar = 0
+        estado_bomba = 'Activada'
     
     elif temperature > 26 and humidity < 100:
         digitalWrite(rele_port, 1)
         sleep(tiempo_bombeo)
         digitalWrite(rele_port, 0)
         
-        return 'Activada'
+        horas_sin_regar = 0
+        estado_bomba = 'Activada'
     
-    elif dias_sin_Regar >= 2:
+    elif horas_sin_Regar >= 48:
         digitalWrite(rele_port, 1)
         sleep(tiempo_bombeo)
         digitalWrite(rele_port, 0)
         
-        return 'Activada'
+        horas_sin_regar = 0
+        estado_bomba = 'Activada'
+        
     else:
         digitalWrite(rele_port, 0)
-        return 'Desactivada'
+        estado_bomba = 'Desactivada'
+        
+    return estado_bomba, horas_sin_regar
 
 def display(temperature, humidity, lum):
     setText("T: " + temperature + "  H: " + humidity + "\nL: " + lum)
@@ -137,20 +145,24 @@ def display(temperature, humidity, lum):
 while True:
     try:
         id_ = id_ + 1
-        
+            
         temperature = temp(dht_sensor_port, dht_type)
         humidity = hum(dht_sensor_port, dht_type)
         lum = lum_sen(light_sensor_port, lum_range)
         display(temperature, humidity, lum)
         
-        estado_rele = rele(temperature, humidity, lum, rele_port, dias_sin_regar, tiempo_bombeo)
+        estado_rele, horas_sin_regar = rele(temperature, humidity, lum, rele_port, horas_sin_regar, tiempo_bombeo)
         
         date = datetime.now()
-        date = date.strftime('%Y-%m-%d %H:%M:$S')
+        date_str = date.strftime('%Y-%m-%d %H:%M:$S')
         
-        datos.appennd([id_, date, temperature, humidity, lum, estado_rele])
-        
-        
+        if id_ > 1:
+            diferencia = date - date_anterior
+            diferencia_horas = diferencia.total_seconds() / 3600
+            horas_sin_regar = horas_sin_regar + diferencia_horas
+            
+        date_anterior = date    
+        datos.appennd([id_, date_str, temperature, humidity, lum, estado_rele])
         
         sleep(sampling)
     except KeyboardInterrupt as e:
