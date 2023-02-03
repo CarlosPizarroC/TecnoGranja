@@ -1,110 +1,126 @@
-from grovepi import *
-from grove_rgb_lcd import *
-from time import sleep
-from math import isnan
-import datetime
+# Se importan las librerías necesarias:
+from grovepi import *           # Para el uso de los sensores (Lumínico, temperatura y humedad).
+from grove_rgb_lcd import *     # Para el uso de la pantalla LCD.
+from time import sleep          # Para implementar tiempos de espera (sampling, tiempo de bombeo , etc.).
+from math import isnan          # Para verificar valores nulos en pro de exponer posibles errores en los sensores.
+import datetime                 # Para utilizar las fechas (Registro de muestras, contabilizar días sin regar).
 
-# Ports
+# Declaración de Puertos:
 
-light_sensor_port = 0
-dht_sensor_port = 3
-rele_port = 7
+light_sensor_port = 0           # Sensor lumínico.
+dht_sensor_port = 3             # Sensor de Temperatura y Humedad.
+rele_port = 7                   # Módulo Relé.
 
-# Initial Config.
+# Configuración Inicial:
 
 pinMode(light_sensor_port, "INPUT")
 pinMode(dht_sensor_port, "INTPUT")
+pinMode(rele_port, "OUTPUT")
 
 digitalWrite(rele_port, 0)
 dht_sensor_type = 0
-setRGB(246 255, 255)
+setRGB(246 255, 255)            # Se define una tonalidad del violeta como color inicial (Correspondiente a la intensidad lumínica "Light")
 temperature = ""
 humidity = ""
-lum = ""
+lum = "Light"
 
-lum_range = [155, 50]
+lum_range = [155, 50]           # Se declaran los valores de la resistancia, producida por el sensor lumínico, que separan las categorías
+                                # de intensidad lumínica "Dark", "Middle" y "Light", de la siguiente forma:
+                                #
+                                #   - lum_range[0] : División Dark-Middle   ;     Es decir lum > lum_range[0] es considerado "Dark").
+                                #   - lum_range[1] : División Middle-Light  ;     Es decir lum_range[0] >= lum > lum_range[1] es considerado "Middle").  
+                                #                                                 Es decir lum_range[1] >= lum > 2 es considerado "Light").  
+       
+tiempo_bombeo = 5               # Aquí se define el tiempo de bombeo como 5 segundos con base a lo requeridos (Este es un valor ejemplo).
 
+# Base de Datos:
 
-lum_anterior = "Dark"
-tiempo_bombeo = 5
-
-### Base de Datos()
+## Se inicializa la matriz donde se guardarán las mediciones realizadas cada "sampling" segundos.
 
 datos = []
-datos.appennd(['ID', 'TimeStamp', 'T', '%RH', 'I.L', 'E.B'])
+datos.appennd(['ID', 'TimeStamp', 'T', '%RH', 'I.L', 'E.B'])    
 id_ = 0
 
 sampling = 3
 
 horas_sin_regar = 0
 
-####################
+# Definición de Función:
 
-def control_RGB(lum_anterior, lum_actual):
-    if lum_anterior != lum_actual:
+def control_RGB(lum_anterior, lum_actual):                          # Función encargada de realizar los cambios en la tonalidad de la pantalla con base
+                                                                    # al nivel de iluminación actual.
         
+    if lum_anterior != lum_actual and not(lum_anterior == 'nan'):   # Solo realizan cambios si hay cambio en el nivel de iluminación y si no es un valor 'nan'.
+        
+                                                                    # Se definen los valores de la tonalidad (RGB) presente y la tonalidad deseada.
         if lum_anterior == 'Dark':
-            x = 119
-            y = 0
-            z = 200
+            r = 119
+            g = 0
+            b = 200
         elif lum_anterior == 'Middle':
-            x = 197
-            y = 57
-            z = 255
+            r = 197
+            g = 57
+            b = 255
         elif lum_anterior == 'Light':
-            x = 246
-            y = 255
-            z = 255
+            r = 246
+            g = 255
+            b = 255
 
         if lum_actual == 'Dark':
-            x_objetivo = 119
-            y_objetivo = 0
-            z_objetivo = 200
+            r_objetivo = 119
+            g_objetivo = 0
+            b_objetivo = 200
         elif lum_actual == 'Middle':
-            x_objetivo = 197
-            y_objetivo = 57
-            z_objetivo = 255
+            r_objetivo = 197
+            g_objetivo = 57
+            b_objetivo = 255
         elif lum_actual == 'Light':
-            x_objetivo = 246
-            y_objetivo = 255
-            z_objetivo = 255
+            r_objetivo = 246
+            g_objetivo = 255
+            b_objetivo = 255
             
-        diffs = [x_objetivo - x, y_objetivo - y, z_objetivo - z]
-        diffs_abs = [abs(x_objetivo - x), abs(y_objetivo - y), abs(z_objetivo - z)]
+        diffs = [r_objetivo - r, g_objetivo - g, b_objetivo - b]                        # Se obtiene la diferencia entre los valores RGB.
+        diffs_abs = [abs(r_objetivo - r), abs(g_objetivo - g), abs(b_objetivo - b)]     # Se obtiene el valor absoluto de estas diferencias.
         
         
-        indice_max = diffs_abs.index(max(diffs_abs))
-        diferencia_max = diffs[indice_max]
+        indice_max = diffs_abs.index(max(diffs_abs))                                    # Se extrae el indice del valor absoluto más grande
+                                                                                        # para así obtener cual es el mayor número de iteraciones
+                                                                                        # que serán necesarias para llegar a la tonalidad.
+                
+        diferencia_max = diffs[indice_max]                                            
         iteraciones = diffs_abs[indice_max]
         
-        if diferecia_max < 0:
+        if diferecia_max < 0:                                                           # Se define si hay que sumar o restar para llegar a las tonalidad
+                                                                                        # y se suma o resta de 1 en 1 hasta que cada valor llegue al objetivo.
+            
             for _ in range(iteraciones):
                 
-                if x > x_objetivo:
-                    x = x - 1
-                if y > y_objetivo:
-                    y = y - 1
-                if z > z_objetivo:
-                    z = z - 1
+                if r > x_objetivo:
+                    r = r - 1
+                if g > g_objetivo:
+                    g = g - 1
+                if b > b_objetivo:
+                    b = b - 1
                     
-                setRGB(x, y, z)
+                setRGB(r, g, b)
                 sleep(0.001)
         else:
+            
             for _ in range(iteraciones):
                 
-                if x < x_objetivo:
-                    x = x + 1
-                if y < y_objetivo:
-                    y = y + 1
-                if z < z_objetivo:
-                    z = z + 1
+                if r < r_objetivo:
+                    r = r + 1
+                if g < g_objetivo:
+                    g = g + 1
+                if b < b_objetivo:
+                    b = b + 1
                  
-                setRGB(x, y, z)
+                setRGB(r, g, b)
                 sleep(0.001)
             
                     
 
-def hum(dht_port, dht_type):
+def hum(dht_port, dht_type):                                    # Función para medir la humedad ambiente ó detectar posibles errores en el sensor dht.
     try:
         [_, h] = dht(dht_port, dht_type)
         if isnan(h):
@@ -116,34 +132,33 @@ def hum(dht_port, dht_type):
         print(str(e))
         setText("")
 
-def temp(dht_port, dht_type):
+def temp(dht_port, dht_type):                                   # Función para medir la temperatura ambiente ó detectar posibles errores en el sensor dht.
     try:
         [t, _] = dht(dht_port, dht_type)
         if isnan(t):
-            raise TypeError('nan Error. DHT sensor: temp')
+            raise TypeError('nan Error. DHT sensor: temp')      # Se eleva un error en caso de recibir un valor nan de parte del sensor.
         
         temperature = str(t)
         return temperature
     except (IOError, TypeError) as e:
-        # print("Error in DHT measurement")
         print(str(e))
         setText("")
 
-def lum_sen(lum_port, lum_range, lum_anterior):
+def lum_sen(lum_port, lum_range, lum_anterior):                 # Función para medir la iluminación ambiente ó detectar posibles errores en el sensor
+                                                                # y categorizar la intensidad lumínica del momento con base con los rangos anteriormente
+                                                                # definidos anteriormente (lum_range).
     try:
-
         dark_middle = lum_range[0]
         middle_sunlight = lum_range[1]
         sensor_value = analogRead(lum_port)
 
-        if isnan(sensor_value):
-            raise TypeError('nan Error. Light sensor')
-
-        resistance = (float)((1023 - sensor_value) * 68) / sensor_value
-#         print("\n", resistance, "\n")
-
-        if resistance > dark_middle:
-            control_RGB(lum_anterior, 'Dark')
+        if isnan(sensor_value):                                 
+            raise TypeError('nan Error. Light sensor')          # Se eleva un error en caso de recibir un valor nan de parte del sensor.
+        resistance = (float)((1023 - sensor_value) * 68) / sensor_value     # Se obtiene el valor de la resistancia.
+        
+        if resistance > dark_middle:                                        # Se define el rango luminíco (lum) y se llama a la función control_RGB()
+                                                                            # para realizar el cambio correspondiente en la tonalidad del display
+            control_RGB(lum_anterior, 'Dark')                               
             lum = "Dark"
             
         elif dark_middle >= resistance > middle_sunlight:
@@ -154,16 +169,17 @@ def lum_sen(lum_port, lum_range, lum_anterior):
             control_RGB(lum_anterior, 'Light')
             lum = "Light"
         else:
-            raise TypeError('Values out of range. Light sensor')
+            raise TypeError('Values out of range. Light sensor')            # Se eleva un error por medición de valores fuera de rango.
 
         return lum
     except (IOError, TypeError) as e:
-#         print('Error')
+
         print(str(e))
         return "nan"
 
-def rele(temperature, humidity, lum, rele_port, horas_sin_regar, tiempo_bombeo):
-    
+def rele(temperature, humidity, lum, rele_port, horas_sin_regar, tiempo_bombeo):        # Función para la actvación de la bomba de riego por medio del relé.
+                                                                                        # Condiciona el riego con base a algunas situaciones 
+                                                                                        # (como más de 2 diás sin riego).
     humidity = float(humidity)
     temperature = float(temperature)
     
@@ -185,7 +201,7 @@ def rele(temperature, humidity, lum, rele_port, horas_sin_regar, tiempo_bombeo):
         horas_sin_regar = 0
         estado_bomba = 'Activada'
     
-    elif horas_sin_Regar >= 48:
+    elif horas_sin_Regar >= 48 and  lum == 'Dark':
         digitalWrite(rele_port, 1)
         sleep(tiempo_bombeo)
         digitalWrite(rele_port, 0)
@@ -199,34 +215,38 @@ def rele(temperature, humidity, lum, rele_port, horas_sin_regar, tiempo_bombeo):
         
     return estado_bomba, horas_sin_regar
 
-def display(temperature, humidity, lum):
+def display(temperature, humidity, lum):                                    # Función para imprimir los valores principales en el display.
     setText("T: " + temperature + "  H: " + humidity + "\nL: " + lum)
 
 
-while True:
+while True:                                                                 # Bucle de funcionamiento.
     try:
-        id_ = id_ + 1
-            
-        temperature = temp(dht_sensor_port, dht_type)
+        id_ = id_ + 1                                                       # Se aumenta el id de la medición.
+                
+        temperature = temp(dht_sensor_port, dht_type)                       # Se realizan las mediciones y se imprimen en el display.
         humidity = hum(dht_sensor_port, dht_type)
-        lum = lum_sen(light_sensor_port, lum_range, lum_anterior)
+        lum = lum_sen(light_sensor_port, lum_range, lum)
         display(temperature, humidity, lum)
         
-        estado_rele, horas_sin_regar = rele(temperature, humidity, lum, rele_port, horas_sin_regar, tiempo_bombeo)
+        estado_rele, horas_sin_regar = rele(temperature, humidity, lum, rele_port, horas_sin_regar, tiempo_bombeo) # Se ejecuta la función rele() para determinar
+                                                                                                                   # la activación de la bomba y resetear el conteo
+                                                                                                                   # días sin regar si se realiza un riego.                                                
         
-        date = datetime.now()
-        date_str = date.strftime('%Y-%m-%d %H:%M:$S')
         
-        if id_ > 1:
+        date = datetime.now()                                               # Se obtiene la fecha actual como un objeto de tipo datetime.
+        date_str = date.strftime('%Y-%m-%d %H:%M:$S')                       # Se obtiene una string de la fecha con un formato específico.
+        
+        if id_ > 1:                                                         # Si ya se ha realizado almenos una medición.
             diferencia = date - date_anterior
             diferencia_horas = diferencia.total_seconds() / 3600
-            horas_sin_regar = horas_sin_regar + diferencia_horas
+            horas_sin_regar = horas_sin_regar + diferencia_horas            # Se aumenta el contador de tiempo sin riego (en horas).
+       
+        date_anterior = date                                                # Se guarda la fecha tipo datetime para realizar el conteo sin riego en la siguiente 
+                                                                            # iteración.
+            
+        datos.appennd([id_, date_str, temperature, humidity, lum, estado_rele]) # Se guarda la medición en la base de datos.
         
-        lum_anterior = lum
-        date_anterior = date    
-        datos.appennd([id_, date_str, temperature, humidity, lum, estado_rele])
-        
-        sleep(sampling)
+        sleep(sampling)                                                     # Se espera el tiempo de muestreo.
     except KeyboardInterrupt as e:
         print(str(e))
         serText("")
